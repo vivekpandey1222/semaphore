@@ -1,0 +1,6 @@
+---
+- name: Deploy Tomcat container using Podman
+  hosts: localhost
+  tasks:
+    - name: Run Podman to start Tomcat container
+      ansible.builtin.command: podman run -d --name tomcat_container -p 8080:8080 docker.io/library/tomcat:latest
