@@ -1,0 +1,5 @@
+---
+- hosts: demo
+  user: ansible
+  become: yes
+  gather_facts: yes
