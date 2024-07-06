@@ -1,0 +1,47 @@
+---
+- name: Deploy Tomcat container
+  hosts: localhost  
+  vars:
+    ansible_python_interpreter: /usr/bin/python3
+    tomcat_image: "docker.io/library/tomcat:latest"
+    tomcat_container_name: "tomcat_container"
+    tomcat_ports:
+      - "8075:8080"
+    tomcat_status_filter: "name=tomcat_container"
+
+  tasks:
+    - name: Pull the Tomcat container image
+      containers.podman.podman_image:
+        name: "{{ tomcat_image }}"
+        tag: latest
+
+    - name: Run Tomcat container
+      containers.podman.podman_container:
+        name: "{{ tomcat_container_name }}"
+        image: "{{ tomcat_image }}"
+        state: started
+        ports: "{{ tomcat_ports }}"
+
+    - name: Wait for Tomcat to start
+      wait_for:
+        host: localhost
+        port: 8075
+        delay: 10
+        timeout: 120
+
+    - name: Verify Tomcat container is running
+      command: podman ps --filter "{{ tomcat_status_filter }}" --format "{% raw %}{{.Status}}{% endraw %}}"
+      register: container_status
+
+    - name: Debug container status
+      debug:
+        var: container_status.stdout
+
+    - name: Print Tomcat container logs for debugging
+      command: podman logs {{ tomcat_container_name }}
+      register: tomcat_logs
+      ignore_errors: yes
+
+    - name: Debug Tomcat logs
+      debug:
+        var: tomcat_logs.stdout
