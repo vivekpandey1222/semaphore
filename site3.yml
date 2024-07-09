@@ -1,11 +1,12 @@
 ---
-- name: Setup and Deploy Tomcat Container on VM
-  hosts: my_vms
-    #become: yes
+- name: Setup and Deploy Tomcat Container locally
+  hosts: localhost  # Target the local machine
+  connection: local  # Use local connection plugin
+
   tasks:
-    - name: Pull Tomcat image from Docker Hub
+    - name: Pull Tomcat image from Docker Hub using Podman
       containers.podman.podman_image:
-        name: tomcat:latest
+        name: docker.io/library/tomcat:latest
 
     - name: List Podman images
       ansible.builtin.command:
