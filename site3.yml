@@ -1,6 +1,7 @@
 ---
 - name: Setup and Deploy Tomcat Container locally
   hosts: localhost  # Target the local machine
+  become: yes
   connection: local  # Use local connection plugin
 
   tasks:
