@@ -7,10 +7,11 @@
     - name: Pull Tomcat image from Docker Hub using Podman
       containers.podman.podman_image:
         name: tomcat:latest
+        executable: /usr/bin/podman  # Specify the correct path to podman executable
 
     - name: List Podman images
       ansible.builtin.command:
-        cmd: podman images
+        cmd: /usr/bin/podman images  # Specify the correct path to podman executable
       register: images_output
 
     - name: Display Podman images
