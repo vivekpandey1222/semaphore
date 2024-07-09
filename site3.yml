@@ -1,47 +1,17 @@
 ---
-- name: Deploy Tomcat container
-  hosts: [my_vms]
-  vars:
-    ansible_python_interpreter: /usr/bin/python3
-    tomcat_image: "docker.io/library/tomcat:latest"
-    tomcat_container_name: "tomcat_container"
-    tomcat_ports:
-      - "8075:8080"
-    tomcat_status_filter: "name=tomcat_container"
-
+- name: Setup and Deploy Tomcat Container on VM
+  hosts: my_vms
+    #become: yes
   tasks:
-    - name: Pull the Tomcat container image
+    - name: Pull Tomcat image from Docker Hub
       containers.podman.podman_image:
-        name: "{{ tomcat_image }}"
-        tag: latest
+        name: tomcat:latest
 
-    - name: Run Tomcat container
-      containers.podman.podman_container:
-        name: "{{ tomcat_container_name }}"
-        image: "{{ tomcat_image }}"
-        state: started
-        ports: "{{ tomcat_ports }}"
+    - name: List Podman images
+      ansible.builtin.command:
+        cmd: podman images
+      register: images_output
 
-    - name: Wait for Tomcat to start
-      wait_for:
-        host: localhost
-        port: 8075
-        delay: 10
-        timeout: 120
-
-    - name: Verify Tomcat container is running
-      command: podman ps --filter "{{ tomcat_status_filter }}" --format "{% raw %}{{.Status}}{% endraw %}}"
-      register: container_status
-
-    - name: Debug container status
-      debug:
-        var: container_status.stdout
-
-    - name: Print Tomcat container logs for debugging
-      command: podman logs {{ tomcat_container_name }}
-      register: tomcat_logs
-      ignore_errors: yes
-
-    - name: Debug Tomcat logs
-      debug:
-        var: tomcat_logs.stdout
+    - name: Display Podman images
+      ansible.builtin.debug:
+        var: images_output.stdout_lines
