@@ -1,0 +1,17 @@
+---
+- name: Check connection to localhost
+  hosts: localhost
+  connection: local
+
+  tasks:
+    - name: Gather facts
+      ansible.builtin.setup:
+
+    - name: Get hostname
+      ansible.builtin.command:
+        cmd: hostname
+      register: hostname_output
+
+    - name: Display hostname
+      ansible.builtin.debug:
+        var: hostname_output.stdout
