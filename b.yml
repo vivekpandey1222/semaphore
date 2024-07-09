@@ -1,17 +1,18 @@
 ---
-- name: Check connection to localhost
+- name: Setup and Deploy Tomcat Container locally
   hosts: localhost
   connection: local
 
   tasks:
-    - name: Gather facts
-      ansible.builtin.setup:
+    - name: Pull Tomcat image from Docker Hub using Podman
+      containers.podman.podman_image:
+        name: tomcat:latest
 
-    - name: Get hostname
+    - name: List Podman images
       ansible.builtin.command:
-        cmd: hostname
-      register: hostname_output
+        cmd: podman images
+      register: images_output
 
-    - name: Display hostname
+    - name: Display Podman images
       ansible.builtin.debug:
-        var: hostname_output.stdout
+        var: images_output.stdout_lines
