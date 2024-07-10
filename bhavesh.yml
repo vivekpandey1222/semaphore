@@ -1,7 +1,7 @@
 ---
 - name: Test Connection with Semaphore
   hosts: localhost
-  become: yes
+  #become: yes
 
   tasks:
     - name: Create a test file
