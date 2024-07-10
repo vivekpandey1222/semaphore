@@ -1,6 +1,6 @@
 ---
 - name: Test Connection with Semaphore Container
-  hosts: localhost
+  hosts: local
   connection: local
 
   tasks:
