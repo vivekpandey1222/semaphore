@@ -1,21 +1,13 @@
 ---
-- name: Test Connection with Semaphore
+- name: Test Connection with Semaphore Container
   hosts: localhost
-  become: yes
+  connection: local
 
   tasks:
-    - name: Create a test file
-      debug:
-        msg: "Creating test file at /tmp/semaphore_test_file.txt"
-      
-    - name: Create a test file
+    - name: Create a test file on local /tmp
       file:
         path: /tmp/semaphore_test_file.txt
         state: touch
-
-    - name: Write a message to the test file
-      debug:
-        msg: "Writing message to the test file"
 
     - name: Write a message to the test file
       copy:
