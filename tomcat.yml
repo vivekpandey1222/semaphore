@@ -1,6 +1,6 @@
 ---
 - name: Deploy Tomcat container with JMX
-  hosts: localhost
+  hosts: my_vms
   vars:
     ansible_python_interpreter: /usr/bin/python3
     tomcat_image: "docker.io/library/tomcat:latest"
