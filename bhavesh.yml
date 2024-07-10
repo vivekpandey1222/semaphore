@@ -1,0 +1,15 @@
+---
+- name: Test Connection with Semaphore
+  hosts: localhost
+  become: yes
+
+  tasks:
+    - name: Create a test file
+      file:
+        path: /tmp/semaphore_test_file.txt
+        state: touch
+
+    - name: Write a message to the test file
+      copy:
+        dest: /tmp/semaphore_test_file.txt
+        content: "Semaphore connection test successful!"
