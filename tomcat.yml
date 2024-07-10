@@ -1,43 +1,21 @@
 ---
-- name: Deploy Tomcat container with JMX
-  hosts: my_servers
+- name: Deploy Tomcat container
+  hosts: localhost  
   vars:
     ansible_python_interpreter: /usr/bin/python3
     tomcat_image: "docker.io/library/tomcat:latest"
     tomcat_container_name: "tomcat1"
     tomcat_ports:
       - "8075:8080"
-      - "8888:8888"  # Adding JMX port
     tomcat_status_filter: "name=tomcat_container"
-    war_file: "/home/madhur/test/webapps/SampleWebApp.war"
+    war_file: "/home/madhur/test/webapps/SampleWebApp.war"  # Update this with the path to your WAR file
     tomcat_webapps_dir: "/usr/local/tomcat/webapps"
-    tomcat_base_dir: "/home/madhur/test"
-    tomcat_logs_dir: "/home/madhur/test/logs"
-    jmx_jar_url: "jmx_prometheus_javaagent-0.16.1.jar"
-    jmx_jar_path: "/usr/local/tomcat/bin/jmx_prometheus_javaagent-0.16.1.jar"
-    jmx_yml_file: "/home/madhur/test/tomcat.yml"
-    setenv_file: "/home/madhur/test/setenv.sh"
 
   tasks:
     - name: Pull the Tomcat container image
       containers.podman.podman_image:
         name: "{{ tomcat_image }}"
         tag: latest
-
-          #- name: Create necessary directories
-          #file:
-          #path: "{{ item }}"
-          #state: directory
-          #mode: '0755'
-          #with_items:
-          #- "{{ tomcat_base_dir }}"
-          #- "{{ tomcat_logs_dir }}"
-    
-          #- name: Download JMX Prometheus Java Agent
-          #get_url:
-          # url: "{{ jmx_jar_url }}"
-          #dest: "{{ tomcat_base_dir }}/jmx_prometheus_javaagent-0.16.1.jar"
-          #mode: '0644'
 
     - name: Run Tomcat container
       containers.podman.podman_container:
@@ -46,21 +24,17 @@
         state: started
         ports: "{{ tomcat_ports }}"
         volumes:
-          - "{{ tomcat_base_dir }}/jmx_prometheus_javaagent-0.16.1.jar:{{ jmx_jar_path }}"
-          - "{{ jmx_yml_file }}:/usr/local/tomcat/bin/tomcat.yml"
-          - "{{ setenv_file }}:/usr/local/tomcat/bin/setenv.sh"
-          - "{{ tomcat_logs_dir }}:/usr/local/tomcat/logs"
-          - "{{ tomcat_base_dir }}/webapps:/usr/local/tomcat/webapps"
+          - "{{ war_file }}:/usr/local/tomcat/webapps/ROOT.war:Z"  # Mount WAR file as ROOT.war
 
-            # - name: Wait for Tomcat to start
-            #wait_for:
-            #host: localhost
-            #port: 8075
-          #delay: 10
-          #timeout: 120
+    - name: Wait for Tomcat to start
+      wait_for:
+        host: localhost
+        port: 8075
+        delay: 10
+        timeout: 120
 
     - name: Verify Tomcat container is running
-      command: podman ps --filter "{{ tomcat_status_filter }}" --format "{{'{{.Status}}'}}"
+      command: podman ps --filter "{{ tomcat_status_filter }}" --format "{% raw %}{{.Status}}{% endraw %}}"
       register: container_status
 
     - name: Debug container status
@@ -75,3 +49,39 @@
     - name: Debug Tomcat logs
       debug:
         var: tomcat_logs.stdout
+
+    - name: Copy WAR file to Tomcat container
+      copy:
+        src: "{{ war_file }}"
+        dest: "{{ tomcat_container_name }}:/usr/local/tomcat/webapps/ROOT.war"          # {{ tomcat_webapps_dir }}/ROOT.war"
+
+    - name: Restart Tomcat container to deploy WAR
+      containers.podman.podman_container:
+        name: "{{ tomcat_container_name }}"
+        image: "{{ tomcat_image }}"
+        state: started
+        restart: true
+
+    - name: Wait for Tomcat to restart
+      wait_for:
+        host: localhost
+        port: 8075
+        delay: 10
+        timeout: 120
+
+    - name: Verify Tomcat container is running after restart
+      command: podman ps --filter "{{ tomcat_status_filter }}" --format "{% raw %}{{.Status}}{% endraw %}}"
+      register: container_status_after_restart
+
+    - name: Debug container status after restart
+      debug:
+        var: container_status_after_restart.stdout
+
+    - name: Print Tomcat container logs after restart for debugging
+      command: podman logs {{ tomcat_container_name }}
+      register: tomcat_logs_after_restart
+      ignore_errors: yes
+
+    - name: Debug Tomcat logs after restart
+      debug:
+        var: tomcat_logs_after_restart.stdout
