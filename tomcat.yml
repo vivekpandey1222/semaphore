@@ -1,6 +1,6 @@
 ---
 - name: Deploy Tomcat container with JMX
-  hosts: my_vms
+  hosts: my_servers
   vars:
     ansible_python_interpreter: /usr/bin/python3
     tomcat_image: "docker.io/library/tomcat:latest"
@@ -9,14 +9,14 @@
       - "8075:8080"
       - "8888:8888"  # Adding JMX port
     tomcat_status_filter: "name=tomcat_container"
-    war_file: "/home/vivek/play/webapps/SampleWebApp.war"
+    war_file: "/home/madhur/test/webapps/SampleWebApp.war"
     tomcat_webapps_dir: "/usr/local/tomcat/webapps"
-    tomcat_base_dir: "/home/vivek/test"
-    tomcat_logs_dir: "/home/vivek/test/logs"
+    tomcat_base_dir: "/home/madhur/test"
+    tomcat_logs_dir: "/home/madhur/test/logs"
     jmx_jar_url: "jmx_prometheus_javaagent-0.16.1.jar"
     jmx_jar_path: "/usr/local/tomcat/bin/jmx_prometheus_javaagent-0.16.1.jar"
-    jmx_yml_file: "/home/vivek/test/tomcat.yml"
-    setenv_file: "/home/vivek/test/setenv.sh"
+    jmx_yml_file: "/home/madhur/test/tomcat.yml"
+    setenv_file: "/home/madhur/test/setenv.sh"
 
   tasks:
     - name: Pull the Tomcat container image
