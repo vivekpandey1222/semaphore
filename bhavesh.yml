@@ -1,7 +1,6 @@
 ---
 - name: Test Connection with Semaphore Container
-  hosts: local
-  connection: local
+  hosts: vivek
 
   tasks:
     - name: Create a test file on local /tmp
