@@ -1,0 +1,91 @@
+---
+- name: Deploy HAProxy with HAProxy-Exporter
+  hosts: my_servers
+  vars:
+    haproxy_image: "docker.io/haproxytech/haproxy-alpine"
+    haproxy_exporter_image: "quay.io/prometheus/haproxy-exporter"
+    container_name: "haproxy"
+    exporter_name: "haproxy-exporter"
+    ports:
+      - "8073:80"
+      - "8406:8404"
+    exporter_ports:
+      - "9103:9101"  # Exporter port
+    haproxy_cfg_content: |
+      global
+          log stdout local0
+          maxconn 2000
+          user haproxy
+          group haproxy
+
+      defaults
+          log global
+          retries 3
+          timeout connect 5000
+          timeout client 50000
+          timeout server 50000
+
+      frontend http-in
+          bind *:80
+          default_backend servers
+
+      backend servers
+          server server1 192.168.1.100:8080 check
+          server server2 192.168.1.101:8080 check
+    haproxy_dest: "/tmp/haproxy.cfg"
+    haproxy_status_filter: "name=haproxy"
+    haproxy_base_file: "/tmp/haproxy.cfg"
+    haproxy_container_path: "/etc/haproxy/haproxy.cfg"
+    haproxy_scrape_uri: "http://192.168.122.1:8406/stats;csv"
+    
+  tasks:
+    - name: "Pull the HAProxy image"
+      containers.podman.podman_image:
+        name: "{{ haproxy_image }}"
+        tag: "latest"
+
+    - name: "Pull the HAProxy-exporter image"
+      containers.podman.podman_image:
+        name: "{{ haproxy_exporter_image }}"
+        tag: "latest"
+        
+    - name: Create setenv.sh for Tomcat
+      copy:
+        content: "{{ haproxy_cfg_content }}"
+        dest: "{{ haproxy_dest }}"
+        mode: '0755'
+
+    - name: "Run the haproxy container"
+      containers.podman.podman_container:
+        name: "{{ container_name }}"
+        image: "{{ haproxy_image }}"
+        state: started
+        ports: "{{ ports }}"
+        volumes:
+          - "{{ haproxy_base_file }}:{{ haproxy_container_path }}"
+
+    - name: "Run the haproxy-exporter container"
+      containers.podman.podman_container:
+        name: "{{ exporter_name }}"
+        image: "{{ haproxy_exporter_image }}"
+        state: started
+        ports: "{{ exporter_ports }}"
+        command:
+          - "--haproxy.scrape-uri={{ haproxy_scrape_uri }}"
+
+    - name: Verify haproxy and haproxy-exporter containers are running
+      command: podman ps --filter "{{ haproxy_status_filter }}" --format "{{'{{.Status}}'}}"
+      register: container_status
+
+    - name: Debug container status
+      debug:
+        var: container_status.stdout
+
+    - name: Print haproxy and haproxy-exporter container logs for debugging
+      command: podman logs {{ container_name }} {{ exporter_name }}
+      register: haproxy_logs
+      ignore_errors: yes
+
+    - name: Debug haproxy and haproxy-exporter logs
+      debug:
+        var: haproxy_logs.stdout
