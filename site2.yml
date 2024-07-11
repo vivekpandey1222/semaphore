@@ -53,7 +53,7 @@
       - "{{ jmx_agent_dest }}:/usr/local/tomcat/bin/jmx_prometheus_javaagent-0.16.1.jar"
       - "{{ setenv_dest }}:/usr/local/tomcat/bin/setenv.sh"
       - "{{ tomcat_yml_dest }}:/usr/local/tomcat/bin/tomcat.yml"
-    tomcat_url: "http://localhost:8075/SampleWebApp1/"
+    tomcat_url: "http://localhost:8077/SampleWebApp1/"
     tomcat_status_filter: "name=tomcat1"
 
   tasks:
