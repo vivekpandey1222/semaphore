@@ -1,5 +1,141 @@
 ---
-- hosts: demo
-  user: ansible
-  become: yes
-  gather_facts: yes
+- name: Deploy Tomcat container and deploy WAR file using Podman
+  hosts: my_servers  
+  vars:
+    tomcat_image: "docker.io/library/tomcat:latest"
+    war_source_path: "/home/madhur/SampleWebApp.war"
+    war_dest_path: "/tmp/SampleWebApp.war"
+    jmx_agent_url: "https://repo1.maven.org/maven2/io/prometheus/jmx/jmx_prometheus_javaagent/0.16.1/jmx_prometheus_javaagent-0.16.1.jar"
+    jmx_agent_dest: "/tmp/jmx_prometheus_javaagent-0.16.1.jar"
+    setenv_content: |
+      JAVA_OPTS="$JAVA_OPTS -javaagent:/usr/local/tomcat/bin/jmx_prometheus_javaagent-0.16.1.jar=9999:/usr/local/tomcat/bin/tomcat.yml"
+      export JAVA_OPTS
+    setenv_dest: "/tmp/setenv.sh"
+    tomcat_yml_content: |
+      lowercaseOutputLabelNames: true
+      lowercaseOutputName: true
+      rules:
+      - pattern: 'Catalina<type=GlobalRequestProcessor, name="(\w+-\w+)-(\d+)"><>(\w+):'
+        name: tomcat_$3_total
+        labels:
+          port: "$2"
+          protocol: "$1"
+        help: Tomcat global $3
+        type: COUNTER
+      - pattern: 'Catalina<j2eeType=Servlet, WebModule=//([-a-zA-Z0-9+&@#/%?=~_|!:.,;]*[-a-zA-Z0-9+&@#/%=~_|]), name=([-a-zA-Z0-9+/$%~_-|!.]*), J2EEApplication=none, J2EEServer=none><>(requestCount|maxTime|processingTime|errorCount):'
+        name: tomcat_servlet_$3_total
+        labels:
+          module: "$1"
+          servlet: "$2"
+        help: Tomcat servlet $3 total
+        type: COUNTER
+      - pattern: 'Catalina<type=ThreadPool, name="(\w+-\w+)-(\d+)"><>(currentThreadCount|currentThreadsBusy|keepAliveCount|pollerThreadCount|connectionCount):'
+        name: tomcat_threadpool_$3
+        labels:
+          port: "$2"
+          protocol: "$1"
+        help: Tomcat threadpool $3
+        type: GAUGE
+      - pattern: 'Catalina<type=Manager, host=([-a-zA-Z0-9+&@#/%?=~_|!:.,;]*[-a-zA-Z0-9+&@#/%=~_|]), context=([-a-zA-Z0-9+/$%~_-|!.]*)><>(processingTime|sessionCounter|rejectedSessions|expiredSessions):'
+        name: tomcat_session_$3_total
+        labels:
+          context: "$2"
+          host: "$1"
+        help: Tomcat session $3 total
+        type: COUNTER
+    tomcat_yml_dest: "/tmp/tomcat.yml"
+    tomcat_container_name: "tomcat"
+    tomcat_ports:
+      - "8075:8080"
+      - "9999:9999"
+    container_volumes:
+      - "{{ war_dest_path }}:/usr/local/tomcat/webapps/helloworld.war"
+      - "{{ jmx_agent_dest }}:/usr/local/tomcat/bin/jmx_prometheus_javaagent-0.16.1.jar"
+      - "{{ setenv_dest }}:/usr/local/tomcat/bin/setenv.sh"
+      - "{{ tomcat_yml_dest }}:/usr/local/tomcat/bin/tomcat.yml"
+    tomcat_url: "http://localhost:8075/helloworld/"
+    tomcat_status_filter: "name=tomcat"
+
+  tasks:
+    #- name: Install Podman Python bindings
+    #  package:
+    #    name: python3-podman
+    #    state: present
+
+    - name: Pull the Tomcat container image
+      containers.podman.podman_image:
+        name: "{{ tomcat_image }}"
+        tag: latest
+
+    - name: Create a directory for SampleWebApp WAR file if not exists
+      file:
+        path: /tmp
+        state: directory
+
+    - name: Ensure SampleWebApp.war file exists on the controller
+      stat:
+        path: "{{ war_source_path }}"
+      register: war_file
+
+        #- name: Fail if the SampleWebApp.war file does not exist
+        #fail:
+        #msg: "The file {{ war_source_path }} does not exist on the controller."
+        #when: not war_file.stat.exists
+
+    - name: Copy SampleWebApp.war to /tmp directory
+      copy:
+        src: "{{ war_source_path }}"
+        dest: "{{ war_dest_path }}"
+
+    - name: Download JMX Prometheus Java agent JAR
+      get_url:
+        url: "{{ jmx_agent_url }}"
+        dest: "{{ jmx_agent_dest }}"
+
+    - name: Create setenv.sh for Tomcat
+      copy:
+        content: "{{ setenv_content }}"
+        dest: "{{ setenv_dest }}"
+        mode: '0755'
+
+    - name: Create tomcat.yml for JMX exporter
+      copy:
+        content: "{{ tomcat_yml_content }}"
+        dest: "{{ tomcat_yml_dest }}"
+
+    - name: Run Tomcat container with JMX exporter
+      containers.podman.podman_container:
+        name: "{{ tomcat_container_name }}"
+        image: "{{ tomcat_image }}"
+        state: started
+        ports: "{{ tomcat_ports }}"
+        volumes: "{{ container_volumes }}"
+
+          #- name: Wait for Tomcat to start
+          #wait_for:
+          # host: localhost
+          # port: 8080
+          #delay: 10
+          #timeout: 120
+
+    - name: Verify Tomcat container is running
+      command: podman ps --filter "{{ tomcat_status_filter }}" --format "{{'{{.Status}}'}}"
+      register: container_status
+
+    - name: Debug container status
+      debug:
+        var: container_status.stdout
+
+    - name: Print Tomcat container logs for debugging
+      command: podman logs {{ tomcat_container_name }}
+      register: tomcat_logs
+      ignore_errors: yes
+
+    - name: Debug Tomcat logs
+      debug:
+        var: tomcat_logs.stdout
+
+    - name: Verify sample application is accessible
+      uri:
+        url: "{{ tomcat_url }}"
+        status_code: 200
