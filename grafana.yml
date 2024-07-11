@@ -1,0 +1,91 @@
+---
+- name: Deploy Grafana & Prometheus in Container
+  hosts: my_servers
+  vars:
+    grafana_image: "docker.io/grafana/grafana"
+    grafana_container_name: "grafana"
+    prometheus_image: "docker.io/prom/prometheus"
+    prometheus_container_name: "prometheus"
+    grafana_data: "/var/lib/grafana"
+    grafana_base: "/tmp/grafana"
+    prometheus_data: "/prometheus"
+    prometheus_base: "/tmp/prometheus"
+    prometheus_config_file: "/home/vivek/prometheus/prometheus.yml"
+    prometheus_container_path: "/etc/prometheus/prometheus.yml"
+    grafana_ports: "3004:3000"
+    prometheus_ports: "9092:9090"
+    grafana_env:
+      GF_SECURITY_ADMIN_USER: "redhat"
+      GF_SECURITY_ADMIN_PASSWORD: "redhat"
+    prometheus_conf_content: |
+      global:
+        scrape_interval: 5s
+        external_labels:
+          monitor: 'node'
+      
+      scrape_configs:
+        - job_name: 'prometheus'
+          static_configs:
+            - targets: ['192.168.122.1:9091']
+        - job_name: 'node-exporter'
+          static_configs:
+            - targets: ['192.168.122.1:9101']
+        - job_name: 'java'
+          static_configs:
+            - targets: ['192.168.122.1:1234']
+        - job_name: 'java2'
+          static_configs:
+            - targets: ['192.168.122.1:1235']
+        - job_name: 'haproxy-exporter'
+          static_configs:
+            - targets: ['192.168.122.1:9102']
+        - job_name: 'tomcat'
+          static_configs:
+            - targets: ['192.168.122.1:9999']
+    
+    prometheus_conf_dest: "/tmp/prometheus.yml"
+
+  tasks:
+    - name: create the direcotry /tmp/grafana
+      file:
+        path: /tmp/grafana
+        state: directory
+        
+    - name: create the direcotry /tmp/prometheus
+      file:
+        path: /tmp/prometheus/data
+        state: directory
+        mode: '0777'
+        
+    - name: Pull Prometheus image
+      containers.podman.podman_image:
+        name: "{{ prometheus_image }}"
+        tag: "latest"
+
+    - name: Pull Grafana image
+      containers.podman.podman_image:
+        name: "{{ grafana_image }}"
+        tag: "latest"
+
+    - name: Run Prometheus container
+      containers.podman.podman_container:
+        name: "{{ prometheus_container_name }}"
+        image: "{{ prometheus_image }}"
+        state: started
+        ports:
+          - "{{ prometheus_ports }}"
+        volumes:
+          - "{{ prometheus_config_file }}:{{ prometheus_container_path }}"
+          - "{{ prometheus_base }}:{{ prometheus_data }}"
+
+    - name: Run Grafana container
+      containers.podman.podman_container:
+        name: "{{ grafana_container_name }}"
+        image: "{{ grafana_image }}"
+        state: started
+        ports:
+          - "{{ grafana_ports }}"
+        env:
+          "{{ grafana_env | to_json }}"  # Convert dictionary to JSON format
+        volumes:
+          - "{{ grafana_base }}:{{ grafana_data }}"
