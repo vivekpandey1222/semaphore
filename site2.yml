@@ -3,14 +3,14 @@
   hosts: my_servers  
   vars:
     tomcat_image: "docker.io/library/tomcat:latest"
-    war_source_path: "/home/madhur/Downloads/SampleWebApp1.war"
-    war_dest_path: "/tmp/SampleWebApp1.war"
+    war_source_path: "/home/madhur/Downloads/hello.war"
+    war_dest_path: "/tmp/hello.war"
     jmx_agent_url: "https://repo1.maven.org/maven2/io/prometheus/jmx/jmx_prometheus_javaagent/0.16.1/jmx_prometheus_javaagent-0.16.1.jar"
     jmx_agent_dest: "/tmp/jmx_prometheus_javaagent-0.16.1.jar"
     setenv_content: |
       JAVA_OPTS="$JAVA_OPTS -javaagent:/usr/local/tomcat/bin/jmx_prometheus_javaagent-0.16.1.jar=9998:/usr/local/tomcat/bin/tomcat1.yml"
       export JAVA_OPTS
-    setenv_dest: "/tmp/setenv.sh"
+    setenv_dest: "/tmp/setenv1.sh"
     tomcat_yml_content: |
       lowercaseOutputLabelNames: true
       lowercaseOutputName: true
@@ -49,11 +49,11 @@
       - "8077:8080"
       - "9998:9998"
     container_volumes:
-      - "{{ war_dest_path }}:/usr/local/tomcat/webapps/SampleWebApp1.war"
+      - "{{ war_dest_path }}:/usr/local/tomcat/webapps/hello.war"
       - "{{ jmx_agent_dest }}:/usr/local/tomcat/bin/jmx_prometheus_javaagent-0.16.1.jar"
-      - "{{ setenv_dest }}:/usr/local/tomcat/bin/setenv.sh"
-      - "{{ tomcat_yml_dest }}:/usr/local/tomcat/bin/tomcat.yml"
-    tomcat_url: "http://localhost:8077/SampleWebApp1/"
+      - "{{ setenv_dest }}:/usr/local/tomcat/bin/setenv1.sh"
+      - "{{ tomcat_yml_dest }}:/usr/local/tomcat/bin/tomcat1.yml"
+    tomcat_url: "http://localhost:8077/hello/"
     tomcat_status_filter: "name=tomcat1"
 
   tasks:
@@ -92,13 +92,13 @@
         url: "{{ jmx_agent_url }}"
         dest: "{{ jmx_agent_dest }}"
 
-    - name: Create setenv.sh for Tomcat
+    - name: Create setenv1.sh for Tomcat
       copy:
         content: "{{ setenv_content }}"
         dest: "{{ setenv_dest }}"
         mode: '0755'
 
-    - name: Create tomcat.yml for JMX exporter
+    - name: Create tomcat1.yml for JMX exporter
       copy:
         content: "{{ tomcat_yml_content }}"
         dest: "{{ tomcat_yml_dest }}"
