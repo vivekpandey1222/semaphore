@@ -6,11 +6,11 @@
     war_source_path: "/home/madhur/Downloads/hello.war"
     war_dest_path: "/tmp/hello.war"
     jmx_agent_url: "https://repo1.maven.org/maven2/io/prometheus/jmx/jmx_prometheus_javaagent/0.16.1/jmx_prometheus_javaagent-0.16.1.jar"
-    jmx_agent_dest: "/tmp/jmx_prometheus_javaagent-0.16.1.jar"
+    jmx_agent_dest: "/tmp/tomcat/jmx_prometheus_javaagent-0.16.1.jar"
     setenv_content: |
       JAVA_OPTS="$JAVA_OPTS -javaagent:/usr/local/tomcat/bin/jmx_prometheus_javaagent-0.16.1.jar=9998:/usr/local/tomcat/bin/tomcat1.yml"
       export JAVA_OPTS
-    setenv_dest: "/tmp/setenv1.sh"
+    setenv_dest: "/tmp/tomcat/setenv.sh"
     tomcat_yml_content: |
       lowercaseOutputLabelNames: true
       lowercaseOutputName: true
@@ -51,7 +51,7 @@
     container_volumes:
       - "{{ war_dest_path }}:/usr/local/tomcat/webapps/hello.war"
       - "{{ jmx_agent_dest }}:/usr/local/tomcat/bin/jmx_prometheus_javaagent-0.16.1.jar"
-      - "{{ setenv_dest }}:/usr/local/tomcat/bin/setenv1.sh"
+      - "{{ setenv_dest }}:/usr/local/tomcat/bin/setenv.sh"
       - "{{ tomcat_yml_dest }}:/usr/local/tomcat/bin/tomcat1.yml"
     tomcat_url: "http://localhost:8077/hello/"
     tomcat_status_filter: "name=tomcat1"
@@ -61,7 +61,11 @@
     #  package:
     #    name: python3-podman
     #    state: present
-
+    - name: Create the tomcat directory
+      file:
+        name: "/tmp/tomcat"
+        state: directory
+        
     - name: Pull the Tomcat container image
       containers.podman.podman_image:
         name: "{{ tomcat_image }}"
@@ -69,7 +73,7 @@
 
     - name: Create a directory for SampleWebApp WAR file if not exists
       file:
-        path: /tmp
+        path: /tmp/
         state: directory
 
     - name: Ensure SampleWebApp.war file exists on the controller
