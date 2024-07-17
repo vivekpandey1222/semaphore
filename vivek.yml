@@ -1,17 +1,129 @@
 ---
-- hosts: localhost
+- name: Deploy Tomcat container and deploy WAR file using Podman
+  hosts: my_servers  
+  vars:
+    tomcat_image: "docker.io/library/tomcat:latest"
+    war_source_path: "/home/madhur/SampleWebApp.war"
+    war_dest_path: "/tmp/tomcat/SampleWebApp.war"
+    jmx_agent_url: "https://repo1.maven.org/maven2/io/prometheus/jmx/jmx_prometheus_javaagent/0.16.1/jmx_prometheus_javaagent-0.16.1.jar"
+    jmx_agent_dest: "/tmp/tomcat/jmx_prometheus_javaagent-0.16.1.jar"
+    webapps_dir: "/tmp/tomcat/webapps"
+    logs_dir: "/tmp/tomcat/logs"
+    setenv_content: |
+      JAVA_OPTS="$JAVA_OPTS -javaagent:/usr/local/tomcat/bin/jmx_prometheus_javaagent-0.16.1.jar=9999:/usr/local/tomcat/bin/tomcat.yml"
+      export JAVA_OPTS
+    setenv_dest: "/tmp/tomcat/setenv.sh"
+    tomcat_yml_content: |
+      lowercaseOutputLabelNames: true
+      lowercaseOutputName: true
+      whitelistObjectNames: ["java.lang:type=OperatingSystem"]
+      blacklistObjectNames: []
+      rules:
+        - pattern: 'java.lang<type=OperatingSystem><>(committed_virtual_memory|free_physical_memory|free_swap_space|total_physical_memory|total_swap_space)_size:'
+          name: os_$1_bytes
+          type: GAUGE
+          attrNameSnakeCase: true
+        - pattern: 'java.lang<type=OperatingSystem><>((?!process_cpu_time)\w+):'
+          name: os_$1
+          type: GAUGE
+          attrNameSnakeCase: true
+    tomcat_yml_dest: "/tmp/tomcat/tomcat.yml"
+    tomcat_container_name: "tomcat"
+    tomcat_ports:
+      - "8075:8080"
+      - "9999:9999"
+    container_volumes:
+      - "{{ war_dest_path }}:/usr/local/tomcat/webapps/ROOT.war"
+      - "{{ jmx_agent_dest }}:/usr/local/tomcat/bin/jmx_prometheus_javaagent-0.16.1.jar"
+      - "{{ setenv_dest }}:/usr/local/tomcat/bin/setenv.sh"
+      - "{{ tomcat_yml_dest }}:/usr/local/tomcat/bin/tomcat.yml"
+      - "{{ logs_dir }}:/usr/local/tomcat/logs"
+      - "{{ webapps_dir }}:/usr/local/tomcat/webapps" 
+    tomcat_url: "http://localhost:8075/"
+    tomcat_status_filter: "name=tomcat"
+
   tasks:
-    - name: Print Hello for install tag
-      debug:
-        msg: "Hello from install tag"
-      tags: install
+    - name: Pull the Tomcat container image
+      containers.podman.podman_image:
+        name: "{{ tomcat_image }}"
+        tag: latest
+      tags: pull_image
 
-    - name: Print Hello for configure tag
-      debug:
-        msg: "Hello from configure tag"
-      tags: configure
+    - name: Create a directory /tmp/tomcat if not exists 
+      file:
+        path: /tmp/tomcat/logs
+        state: directory
+      tags: create_directories
 
-    - name: Print Hello for start tag
+    - name: Create a directory webapps for file if not exists
+      file:
+        path: /tmp/tomcat/webapps
+        state: directory
+      tags: create_directories
+
+    - name: Ensure SampleWebApp.war file exists on the controller
+      stat:
+        path: "{{ war_source_path }}"
+      register: war_file
+      tags: check_war
+
+    - name: Copy SampleWebApp.war to /tmp/tomcat directory
+      copy:
+        src: "{{ war_source_path }}"
+        dest: "{{ war_dest_path }}"
+      tags: copy_war
+
+    - name: Download JMX Prometheus Java agent JAR
+      get_url:
+        url: "{{ jmx_agent_url }}"
+        dest: "{{ jmx_agent_dest }}"
+      tags: download_jmx
+
+    - name: Create setenv.sh for Tomcat
+      copy:
+        content: "{{ setenv_content }}"
+        dest: "{{ setenv_dest }}"
+        mode: '0755'
+      tags: configure_tomcat
+
+    - name: Create tomcat.yml for JMX exporter
+      copy:
+        content: "{{ tomcat_yml_content }}"
+        dest: "{{ tomcat_yml_dest }}"
+      tags: configure_tomcat
+
+    - name: Run Tomcat container with JMX exporter
+      containers.podman.podman_container:
+        name: "{{ tomcat_container_name }}"
+        image: "{{ tomcat_image }}"
+        state: started
+        ports: "{{ tomcat_ports }}"
+        volumes: "{{ container_volumes }}"
+      tags: run_container
+
+    - name: Verify Tomcat container is running
+      command: podman ps --filter "{{ tomcat_status_filter }}" --format "{{'{{.Status}}'}}"
+      register: container_status
+      tags: verify_container
+
+    - name: Debug container status
       debug:
-        msg: "Hello from start tag"
-      tags: start
+        var: container_status.stdout
+      tags: debug
+
+    - name: Print Tomcat container logs for debugging
+      command: podman logs {{ tomcat_container_name }}
+      register: tomcat_logs
+      ignore_errors: yes
+      tags: debug
+
+    - name: Debug Tomcat logs
+      debug:
+        var: tomcat_logs.stdout
+      tags: debug
+
+    - name: Verify sample application is accessible
+      uri:
+        url: "{{ tomcat_url }}"
+        status_code: 200
+      tags: verify_application
