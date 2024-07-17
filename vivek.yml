@@ -1,19 +1,17 @@
+---
 - hosts: localhost
   tasks:
-    - name: Install nginx
-      apt:
-        name: nginx
-        state: present
+    - name: Print Hello for install tag
+      debug:
+        msg: "Hello from install tag"
       tags: install
 
-    - name: Configure nginx
-      template:
-        src: nginx.conf.j2
-        dest: /etc/nginx/nginx.conf
+    - name: Print Hello for configure tag
+      debug:
+        msg: "Hello from configure tag"
       tags: configure
 
-    - name: Start nginx
-      service:
-        name: nginx
-        state: started
+    - name: Print Hello for start tag
+      debug:
+        msg: "Hello from start tag"
       tags: start
